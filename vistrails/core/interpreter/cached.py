@@ -44,8 +44,7 @@ import cPickle as pickle
 from vistrails.core.common import InstanceObject, VistrailsInternalError
 from vistrails.core.data_structures.bijectivedict import Bidict
 from vistrails.core import debug
-import vistrails.core.interpreter.base
-from vistrails.core.interpreter.base import AbortExecution
+from vistrails.core.interpreter.base import AbortExecution, InternalTuple, BaseInterpreter
 from vistrails.core.log.controller import DummyLogController
 from vistrails.core.modules.basic_modules import identifier as basic_pkg, \
                                                  Generator
@@ -197,10 +196,10 @@ class ViewUpdatingLogController(object):
 Variant_desc = None
 InputPort_desc = None
 
-class CachedInterpreter(vistrails.core.interpreter.base.BaseInterpreter):
+class CachedInterpreter(BaseInterpreter):
 
     def __init__(self):
-        vistrails.core.interpreter.base.BaseInterpreter.__init__(self)
+        BaseInterpreter.__init__(self)
         self.debugger = None
         self.create()
 
@@ -396,7 +395,7 @@ class CachedInterpreter(vistrails.core.interpreter.base.BaseInterpreter):
                         errors[i] = err
                         to_delete.append(obj.id)
                 else:
-                    tupleModule = vistrails.core.interpreter.base.InternalTuple()
+                    tupleModule = InternalTuple()
                     tupleModule.length = len(f.params)
                     for (j,p) in enumerate(f.params):
                         try:

@@ -35,4 +35,4 @@
 ###############################################################################
 from __future__ import division
 
-pass
+from .cached import CachedInterpreter as Interpreter

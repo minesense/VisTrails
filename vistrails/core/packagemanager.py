@@ -313,8 +313,8 @@ class PackageManager(object):
         """remove_package(name): Removes a package from the system."""
         pkg = self._package_list[codepath]
 
-        from vistrails.core.interpreter.cached import CachedInterpreter
-        CachedInterpreter.clear_package(pkg.identifier)
+        from vistrails.core.interpreter import Interpreter
+        Interpreter.clear_package(pkg.identifier)
 
         self._dependency_graph.delete_vertex(pkg.identifier)
         del self._package_versions[pkg.identifier][pkg.version]

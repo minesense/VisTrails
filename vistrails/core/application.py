@@ -49,7 +49,7 @@ import vistrails.core.db.action
 from vistrails.core.db.locator import BaseLocator, FileLocator, DBLocator, \
     UntitledLocator
 import vistrails.core.db.io
-import vistrails.core.interpreter.cached
+import vistrails.core.interpreter
 import vistrails.core.interpreter.default
 from vistrails.core.modules.module_registry import ModuleRegistry
 from vistrails.core.packagemanager import PackageManager
@@ -67,7 +67,7 @@ APP_FAIL = 1 # fialed exit code
 APP_DONE = 2 # Success but shut down prematurely (other instance called)
 
 def finalize_vistrails(app):
-    vistrails.core.interpreter.cached.CachedInterpreter.cleanup()
+    vistrails.core.interpreter.Interpreter.cleanup()
 
 def get_vistrails_application():
     if VistrailsApplication is not None:
@@ -296,7 +296,7 @@ class VistrailsApplicationInterface(object):
         return True
 
     def finishSession(self):
-        vistrails.core.interpreter.cached.CachedInterpreter.cleanup()
+        vistrails.core.interpreter.Interpreter.cleanup()
         
     def save_configuration(self):
         """ save_configuration() -> None
