@@ -63,7 +63,7 @@ from vistrails.core.vistrail.module_function import ModuleFunction
 from vistrails.core.vistrail.module_param import ModuleParam
 from vistrails.core.vistrail.port import PortEndPoint
 from vistrails.core.vistrail.port_spec import PortSpec
-from vistrails.core.interpreter.base import AbortExecution
+from vistrails.core.interpreter import AbortExecution
 from vistrails.core.interpreter.default import get_default_interpreter
 from vistrails.core.utils import VistrailsDeprecation
 from vistrails.gui.base_view import BaseView

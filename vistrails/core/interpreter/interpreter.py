@@ -44,8 +44,6 @@ import cPickle as pickle
 from vistrails.core.common import InstanceObject, VistrailsInternalError
 from vistrails.core.data_structures.bijectivedict import Bidict
 from vistrails.core import debug
-from vistrails.core.interpreter.base import AbortExecution, BaseInterpreter, \
-    InternalTuple
 from vistrails.core.log.controller import DummyLogController
 from vistrails.core.modules.basic_modules import identifier as basic_pkg, \
                                                  Generator
@@ -57,6 +55,37 @@ from vistrails.core.utils import DummyView
 import vistrails.core.system
 import vistrails.core.vistrail.pipeline
 
+
+###############################################################################
+
+class InternalTuple(object):
+    """Tuple used internally for constant tuples."""
+
+    list_depth = 0
+
+    def _get_length(self, length):
+        return len(self._values)
+    def _set_length(self, length):
+        self._values = [None] * length
+    length = property(_get_length, _set_length)
+
+    def compute(self):
+        return
+
+    def set_input_port(self, index, connector):
+        self._values[index] = connector()
+
+    def get_output(self, port):
+        return tuple(self._values)
+
+    def update(self):
+        pass
+
+###############################################################################
+
+class AbortExecution(Exception):
+    """Internal exception raised to signal the interpreter it should stop.
+    """
 
 ###############################################################################
 
@@ -197,10 +226,9 @@ class ViewUpdatingLogController(object):
 Variant_desc = None
 InputPort_desc = None
 
-class Interpreter(BaseInterpreter):
+class Interpreter(object):
 
     def __init__(self):
-        BaseInterpreter.__init__(self)
         self.debugger = None
         self.create()
 
@@ -212,6 +240,67 @@ class Interpreter(BaseInterpreter):
         self._objects = {}
         self.filePool = self._file_pool
         self._streams = []
+
+    def resolve_aliases(self, pipeline,
+                        customAliases=None):
+        # We don't build the alias dictionary anymore because as we don't
+        # perform expression evaluation anymore, the values won't change.
+        # We only care for custom aliases because they might have a value
+        # different from what it's stored.
+
+        aliases = {}
+        if customAliases:
+            #customAliases can be only a subset of the aliases
+            #so we need to build the Alias Dictionary always
+            for k,v in customAliases.iteritems():
+                aliases[k] = v
+            # no support for expression evaluation. The code that does that is
+            # ugly and dangerous.
+#        ordered = self.compute_evaluation_order(aliases)
+#        casting = {'int': int, 'float': float, 'double': float, 'string': str,
+#                   'Integer': int, 'Float': float, 'String': str}
+#        for alias in reversed(ordered):
+#            (atype,base) = aliases[alias]
+#            #no expression evaluation anymore
+#            aliases[alias] = base
+#            #value = self.evaluate_exp(atype,base,exps,aliases)
+#            #aliases[alias] = value
+        for alias in aliases:
+            try:
+                info = pipeline.aliases[alias]
+                param = pipeline.db_get_object(info[0],info[1])
+                param.strValue = str(aliases[alias])
+            except KeyError:
+                pass
+
+        return aliases
+
+    def update_params(self, pipeline,
+                        customParams=None):
+        """update_params(pipeline: Pipeline,
+                         customParams=[(vttype, oId, strval)] -> None
+        This will set the new parameter values in the pipeline before
+        execution
+
+        """
+        if customParams:
+            for (vttype, oId, strval) in customParams:
+                try:
+                    param = pipeline.db_get_object(vttype,oId)
+                    param.strValue = str(strval)
+                except Exception, e:
+                    debug.debug("Problem when updating params", e)
+
+    def resolve_variables(self, vistrail_variables, pipeline):
+        for m in pipeline.module_list:
+            if m.is_vistrail_var():
+                vistrail_var = vistrail_variables(m.get_vistrail_var())
+                if vistrail_var is None: # assume set in parameter exploration
+                    continue
+                strValue = vistrail_var.value
+                for func in m.functions:
+                    if func.name == 'value':
+                        func.params[0].strValue = strValue
 
     def clear(self):
         self._file_pool.cleanup()
@@ -301,7 +390,6 @@ class Interpreter(BaseInterpreter):
         sinks = fetch('sinks', None)
         reason = fetch('reason', None)
         actions = fetch('actions', None)
-        done_summon_hooks = fetch('done_summon_hooks', [])
         module_executed_hook = fetch('module_executed_hook', [])
         stop_on_error = fetch('stop_on_error', True)
         parent_exec = fetch('parent_exec', None)
@@ -428,11 +516,6 @@ class Interpreter(BaseInterpreter):
             dst = self._objects[conn.destinationId]
             self.make_connection(conn, src, dst)
 
-        if self.done_summon_hook:
-            self.done_summon_hook(self._persistent_pipeline, self._objects)
-        for callable_ in done_summon_hooks:
-            callable_(self._persistent_pipeline, self._objects)
-
         tmp_id_to_module_map = {}
         for i, j in tmp_to_persistent_module_map.iteritems():
             tmp_id_to_module_map[i] = self._objects[j]
@@ -456,7 +539,6 @@ class Interpreter(BaseInterpreter):
         reason = fetch('reason', None)
         actions = fetch('actions', None)
         module_executed_hook = fetch('module_executed_hook', [])
-        done_summon_hooks = fetch('done_summon_hooks', [])
         clean_pipeline = fetch('clean_pipeline', False)
         stop_on_error = fetch('stop_on_error', True)
         parent_exec = fetch('parent_exec', None)
@@ -591,9 +673,6 @@ class Interpreter(BaseInterpreter):
 
         Generator.generators = self._streams.pop()
 
-        if self.done_update_hook:
-            self.done_update_hook(self._persistent_pipeline, self._objects)
-
         # objs, errs, and execs are mappings that use the local ids as keys,
         # as opposed to the persistent ids.
         # They are thus ideal to external consumption.
@@ -667,7 +746,6 @@ class Interpreter(BaseInterpreter):
           logger = fetch('logger', DummyLogController)
           reason = fetch('reason', None)
           actions = fetch('actions', None)
-          done_summon_hooks = fetch('done_summon_hooks', [])
           module_executed_hook = fetch('module_executed_hook', [])
           job_monitor = fetch('job_monitor', None)
 
@@ -709,7 +787,6 @@ class Interpreter(BaseInterpreter):
         sinks = fetch('sinks', None)
         reason = fetch('reason', None)
         actions = fetch('actions', None)
-        done_summon_hooks = fetch('done_summon_hooks', [])
         module_executed_hook = fetch('module_executed_hook', [])
         stop_on_error = fetch('stop_on_error', True)
         parent_exec = fetch('parent_exec', None)

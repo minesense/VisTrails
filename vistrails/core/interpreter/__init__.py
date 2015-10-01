@@ -38,4 +38,4 @@ from __future__ import division
 
 
 from vistrails.core.interpreter.interpreter import ViewUpdatingLogController, \
-    Interpreter
+    Interpreter, AbortExecution
