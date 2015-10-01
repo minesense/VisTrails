@@ -44,7 +44,8 @@ import cPickle as pickle
 from vistrails.core.common import InstanceObject, VistrailsInternalError
 from vistrails.core.data_structures.bijectivedict import Bidict
 from vistrails.core import debug
-from vistrails.core.interpreter.base import AbortExecution, InternalTuple, BaseInterpreter
+from vistrails.core.interpreter.base import AbortExecution, BaseInterpreter, \
+    InternalTuple
 from vistrails.core.log.controller import DummyLogController
 from vistrails.core.modules.basic_modules import identifier as basic_pkg, \
                                                  Generator
@@ -196,7 +197,7 @@ class ViewUpdatingLogController(object):
 Variant_desc = None
 InputPort_desc = None
 
-class CachedInterpreter(BaseInterpreter):
+class Interpreter(BaseInterpreter):
 
     def __init__(self):
         BaseInterpreter.__init__(self)
@@ -317,7 +318,7 @@ class CachedInterpreter(BaseInterpreter):
             getter = reg.get_descriptor_by_name
             descriptor = getter(basic_pkg, 'Null')
             return descriptor.module()
-        
+
         def create_constant(param, module):
             """Creates a Constant from a parameter spec"""
             getter = reg.get_descriptor_by_name
@@ -351,7 +352,7 @@ class CachedInterpreter(BaseInterpreter):
             self.resolve_variables(vistrail_variables,  pipeline)
 
         self.update_params(pipeline, params)
-        
+
         (tmp_to_persistent_module_map,
          conn_map,
          module_added_set,
@@ -365,7 +366,7 @@ class CachedInterpreter(BaseInterpreter):
             obj.interpreter = self
             obj.id = persistent_id
             obj.signature = module._signature
-            
+
             # Checking if output should be stored
             if module.has_annotation_with_key('annotate_output'):
                 annotate_output = module.get_annotation_by_key('annotate_output')
@@ -438,7 +439,7 @@ class CachedInterpreter(BaseInterpreter):
         return (tmp_id_to_module_map, tmp_to_persistent_module_map.inverse,
                 module_added_set, conn_added_set, to_delete, errors)
 
-    def execute_pipeline(self, pipeline, tmp_id_to_module_map, 
+    def execute_pipeline(self, pipeline, tmp_id_to_module_map,
                          persistent_to_tmp_id_map, **kwargs):
         def fetch(name, default):
             return kwargs.pop(name, default)
@@ -489,7 +490,7 @@ class CachedInterpreter(BaseInterpreter):
             obj.in_pipeline = True # set flag to indicate in pipeline
             obj.logging = logging_obj
             obj.change_parameter = make_change_parameter(obj)
-            
+
             # Update object pipeline information
             obj.moduleInfo['locator'] = locator
             obj.moduleInfo['version'] = current_version
@@ -592,7 +593,7 @@ class CachedInterpreter(BaseInterpreter):
 
         if self.done_update_hook:
             self.done_update_hook(self._persistent_pipeline, self._objects)
-                
+
         # objs, errs, and execs are mappings that use the local ids as keys,
         # as opposed to the persistent ids.
         # They are thus ideal to external consumption.
@@ -769,7 +770,7 @@ class CachedInterpreter(BaseInterpreter):
                                         aliases:dict, params:list)-> None
         It will annotate the workflow execution in logger with the reason,
         aliases and params.
-        
+
         """
         d = {}
         d["__reason__"] = reason
@@ -778,7 +779,7 @@ class CachedInterpreter(BaseInterpreter):
         if params is not None and isinstance(params, list):
             d["__params__"] = pickle.dumps(params)
         logger.insert_workflow_exec_annotations(d)
-        
+
     def add_to_persistent_pipeline(self, pipeline):
         """add_to_persistent_pipeline(pipeline):
         (module_id_map, connection_id_map, modules_added)
@@ -836,9 +837,9 @@ class CachedInterpreter(BaseInterpreter):
         self._persistent_pipeline.compute_signatures()
         return (module_id_map, connection_id_map,
                 modules_added, connections_added)
-        
+
     def find_persistent_entities(self, pipeline):
-        """returns a map from a pipeline to the persistent pipeline, 
+        """returns a map from a pipeline to the persistent pipeline,
         assuming those pieces exist"""
         persistent_p = self._persistent_pipeline
         object_map = {}
@@ -868,24 +869,24 @@ class CachedInterpreter(BaseInterpreter):
     __instance = None
     @staticmethod
     def get():
-        if not CachedInterpreter.__instance:
-            CachedInterpreter.__instance = CachedInterpreter()
-        return CachedInterpreter.__instance
+        if not Interpreter.__instance:
+            Interpreter.__instance = Interpreter()
+        return Interpreter.__instance
 
     @staticmethod
     def cleanup():
-        if CachedInterpreter.__instance:
-            CachedInterpreter.__instance.clear()
+        if Interpreter.__instance:
+            Interpreter.__instance.clear()
         objs = gc.collect()
 
     @staticmethod
     def flush():
-        if CachedInterpreter.__instance:
-            CachedInterpreter.__instance.clear()
-            CachedInterpreter.__instance.create()
+        if Interpreter.__instance:
+            Interpreter.__instance.clear()
+            Interpreter.__instance.create()
         objs = gc.collect()
 
     @staticmethod
     def clear_package(identifier):
-        if CachedInterpreter.__instance:
-            CachedInterpreter.__instance._clear_package(identifier)
+        if Interpreter.__instance:
+            Interpreter.__instance._clear_package(identifier)

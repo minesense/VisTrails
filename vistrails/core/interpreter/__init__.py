@@ -33,6 +33,9 @@
 ## ADVISED OF THE POSSIBILITY OF SUCH DAMAGE."
 ##
 ###############################################################################
+
 from __future__ import division
 
-from .cached import CachedInterpreter as Interpreter
+
+from vistrails.core.interpreter.interpreter import ViewUpdatingLogController, \
+    Interpreter

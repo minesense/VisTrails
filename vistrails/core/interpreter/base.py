@@ -148,5 +148,3 @@ class BaseInterpreter(object):
         
         """
         self.done_update_hook = hook
-
-##############################################################################
