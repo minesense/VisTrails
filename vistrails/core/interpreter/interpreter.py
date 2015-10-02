@@ -90,6 +90,8 @@ class AbortExecution(Exception):
 ###############################################################################
 
 class ViewUpdatingLogController(object):
+    """Wrapper for the interpreter for the log controller and a real-time view.
+    """
     class Loop(object):
         def __init__(self, logger, view):
             self.log = logger
@@ -227,75 +229,67 @@ Variant_desc = None
 InputPort_desc = None
 
 class Interpreter(object):
+    """The interpreter, that takes a Pipeline and executes it.
 
+    This is the core of VisTrails pipeline execution. It takes a Pipeline and
+    create the actual modules that need to execute, caching them so future
+    executions are efficient. It also handle looping and streaming in the
+    pipeline, and expansion of groups and subworkflows. It reports all that is
+    happening on the ViewUpdatingLogController, that records it in the log and
+    possibly update a real-time view of the execution status (like the pipeline
+    view).
+    """
     def __init__(self):
         self.debugger = None
         self.create()
 
     def create(self):
-        # FIXME moved here because otherwise we hit the registry too early
         from vistrails.core.modules.module_utils import FilePool
+
         self._file_pool = FilePool()
         self._persistent_pipeline = vistrails.core.vistrail.pipeline.Pipeline()
         self._objects = {}
         self.filePool = self._file_pool
         self._streams = []
 
-    def resolve_aliases(self, pipeline,
-                        customAliases=None):
-        # We don't build the alias dictionary anymore because as we don't
-        # perform expression evaluation anymore, the values won't change.
-        # We only care for custom aliases because they might have a value
-        # different from what it's stored.
+    def resolve_aliases(self, pipeline, customAliases=None):
+        """Update parameters for the given custom aliases.
 
-        aliases = {}
+        :type customAliases: dict[str, object]
+        """
         if customAliases:
-            #customAliases can be only a subset of the aliases
-            #so we need to build the Alias Dictionary always
-            for k,v in customAliases.iteritems():
-                aliases[k] = v
-            # no support for expression evaluation. The code that does that is
-            # ugly and dangerous.
-#        ordered = self.compute_evaluation_order(aliases)
-#        casting = {'int': int, 'float': float, 'double': float, 'string': str,
-#                   'Integer': int, 'Float': float, 'String': str}
-#        for alias in reversed(ordered):
-#            (atype,base) = aliases[alias]
-#            #no expression evaluation anymore
-#            aliases[alias] = base
-#            #value = self.evaluate_exp(atype,base,exps,aliases)
-#            #aliases[alias] = value
+            aliases = dict(customAliases)
+        else:
+            aliases = {}
+
         for alias in aliases:
             try:
                 info = pipeline.aliases[alias]
-                param = pipeline.db_get_object(info[0],info[1])
+                param = pipeline.db_get_object(info[0], info[1])
                 param.strValue = str(aliases[alias])
             except KeyError:
                 pass
 
         return aliases
 
-    def update_params(self, pipeline,
-                        customParams=None):
-        """update_params(pipeline: Pipeline,
-                         customParams=[(vttype, oId, strval)] -> None
-        This will set the new parameter values in the pipeline before
-        execution
-
+    def update_params(self, pipeline, customParams=None):
+        """Sets the new parameter values in the pipeline before execution.
         """
         if customParams:
             for (vttype, oId, strval) in customParams:
                 try:
-                    param = pipeline.db_get_object(vttype,oId)
+                    param = pipeline.db_get_object(vttype, oId)
                     param.strValue = str(strval)
                 except Exception, e:
                     debug.debug("Problem when updating params", e)
 
     def resolve_variables(self, vistrail_variables, pipeline):
+        """Resolves variables and sets values on the pipeline.
+        """
         for m in pipeline.module_list:
             if m.is_vistrail_var():
                 vistrail_var = vistrail_variables(m.get_vistrail_var())
-                if vistrail_var is None: # assume set in parameter exploration
+                if vistrail_var is None:  # assume set in parameter exploration
                     continue
                 strValue = vistrail_var.value
                 for func in m.functions:
@@ -313,10 +307,10 @@ class Interpreter(object):
         self.clear()
 
     def clean_modules(self, modules_to_clean):
-        """clean_modules(modules_to_clean: list of persistent module ids)
+        """Removes modules by id from the persistent pipeline.
 
-        Removes modules from the persistent pipeline, and the modules that
-        depend on them."""
+        This will remove all the modules that depend on them (downstream).
+        """
         if not modules_to_clean:
             return
         g = self._persistent_pipeline.graph
@@ -328,10 +322,7 @@ class Interpreter(object):
             del self._objects[v]
 
     def clean_non_cacheable_modules(self):
-        """clean_non_cacheable_modules() -> None
-
-        Removes all modules that are not cacheable from the persistent
-        pipeline, and the modules that depend on them.
+        """Removes all modules that are not cacheable from persistent pipeline,
         """
         if True:  # FIXME: don't cache anything
             non_cacheable_modules = [i for
@@ -343,10 +334,7 @@ class Interpreter(object):
         self.clean_modules(non_cacheable_modules)
 
     def _clear_package(self, identifier):
-        """clear_package(identifier: str) -> None
-
-        Removes all modules from the given package from the persistent
-        pipeline.
+        """Removes all modules from the given package from persistent pipeline.
         """
         modules = [mod.id
                    for mod in self._persistent_pipeline.module_list
@@ -354,9 +342,7 @@ class Interpreter(object):
         self.clean_modules(modules)
 
     def make_connection(self, conn, src, dst):
-        """make_connection(self, conn, src, dst)
-        Builds a execution-time connection between modules.
-
+        """Builds a execution-time connection between modules.
         """
         iport = conn.destination.name
         oport = conn.source.name
@@ -371,10 +357,7 @@ class Interpreter(object):
                                            typecheck))
 
     def setup_pipeline(self, pipeline, **kwargs):
-        """setup_pipeline(controller, pipeline, locator, currentVersion,
-                          view, aliases, **kwargs)
-        Matches a pipeline with the persistent pipeline and creates
-        instances of modules that aren't in the cache.
+        """Creates missing modues in persistent pipeline to match pipeline.
         """
         def fetch(name, default):
             return kwargs.pop(name, default)
@@ -413,8 +396,6 @@ class Interpreter(object):
             desc = getter(param.identifier, param.type, param.namespace)
             constant = desc.module()
             constant.id = module.id
-#             if param.evaluatedStrValue:
-#                 constant.setValue(param.evaluatedStrValue)
             if param.strValue != '':
                 constant.setValue(param.strValue)
             else:
@@ -422,10 +403,6 @@ class Interpreter(object):
                     constant.translate_to_string(constant.default_value))
             return constant
 
-        ### BEGIN METHOD ###
-
-#         if self.debugger:
-#             self.debugger.update()
         to_delete = []
         errors = {}
 
@@ -796,15 +773,6 @@ class Interpreter(object):
             raise VistrailsInternalError('Wrong parameters passed '
                                          'to execute: %s' % kwargs)
         self.clean_non_cacheable_modules()
-
-
-#         if controller is not None:
-#             vistrail = controller.vistrail
-#             (pipeline, module_remap) = \
-#                 core.db.io.expand_workflow(vistrail, pipeline)
-#             new_kwargs['module_remap'] = module_remap
-#         else:
-#             vistrail = None
 
         if controller is not None:
             vistrail = controller.vistrail
