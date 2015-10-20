@@ -63,7 +63,7 @@ class InternalTuple(object):
 
     list_depth = 0
 
-    def _get_length(self, length):
+    def _get_length(self):
         return len(self._values)
     def _set_length(self, length):
         self._values = [None] * length
@@ -404,7 +404,7 @@ class Interpreter(object):
             if param.strValue != '':
                 constant.setValue(param.strValue)
             else:
-                constant.setValue( \
+                constant.setValue(
                     constant.translate_to_string(constant.default_value))
             return constant
 
@@ -804,12 +804,12 @@ class Interpreter(object):
         self.finalize_pipeline(pipeline, *(res[:-1]), **new_kwargs)
 
         result = InstanceObject(objects=res[1],
-                              errors=res[2],
-                              executed=res[3],
-                              suspended=res[4],
-                              parameter_changes=res[6],
-                              modules_added=modules_added,
-                              conns_added=conns_added)
+                                errors=res[2],
+                                executed=res[3],
+                                suspended=res[4],
+                                parameter_changes=res[6],
+                                modules_added=modules_added,
+                                conns_added=conns_added)
 
         logger.finish_workflow_execution(result.errors, suspended=result.suspended)
 
