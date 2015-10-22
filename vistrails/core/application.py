@@ -66,9 +66,6 @@ APP_SUCCESS = 0 # Success exit code
 APP_FAIL = 1 # fialed exit code
 APP_DONE = 2 # Success but shut down prematurely (other instance called)
 
-def finalize_vistrails(app):
-    vistrails.core.interpreter.Interpreter.cleanup()
-
 def get_vistrails_application():
     if VistrailsApplication is not None:
         return VistrailsApplication
