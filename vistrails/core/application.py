@@ -167,6 +167,8 @@ class VistrailsApplicationInterface(object):
         self.package_manager = PackageManager(self.registry,
                                               self.startup)
 
+        self._initialized = True
+
     def check_all_requirements(self):
         # check scipy
         vistrails.core.requirements.require_python_module('scipy', {

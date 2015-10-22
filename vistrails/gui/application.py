@@ -250,8 +250,6 @@ class VistrailsApplicationSingleton(VistrailsApplicationInterface,
             if self.temp_configuration.check('dbDefault'):
                 self.builderWindow.setDBDefault(True)
 
-        self._initialized = True
-
         # default handler installation
         if system.systemType == 'Linux':
             if not (self.temp_configuration.check('handlerDontAsk') or
@@ -262,8 +260,8 @@ class VistrailsApplicationSingleton(VistrailsApplicationInterface,
         if interactive:
             self.interactiveMode()
         else:
-            r = self.noninteractiveMode()
-            return APP_SUCCESS if r is True else APP_FAIL
+            if not self.noninteractiveMode():
+                return APP_FAIL
         return APP_SUCCESS
 
     def ask_update_default_application(self, dont_ask_checkbox=True):

@@ -2251,7 +2251,6 @@ class VistrailsServerSingleton(VistrailsApplicationInterface,
                                               self.temp_configuration.check('rpcPort'))
         self.load_config(self.temp_configuration.check('rpcConfig'))
         self.start_other_instances(self.temp_configuration.check('rpcInstances'))
-        self._initialized = True
         return True
 
     def start_other_instances(self, number):
