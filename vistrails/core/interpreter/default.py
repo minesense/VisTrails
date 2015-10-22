@@ -35,21 +35,10 @@
 ###############################################################################
 from __future__ import division
 
-##############################################################################
-
-def set_cache_configuration(field, value):
-    # TODO
-    pass
-
-def connect_to_configuration(configuration):
-    # TODO
-    pass
 
 def get_default_interpreter():
-    """Returns an instance of the default interpreter class.
-
-    Deprecated, just use :obj:`vistrails.core.interpreter.Interpreter`.
+    """Returns the application-global interpreter.
     """
-    from vistrails.core.interpreter import Interpreter
+    from vistrails.core.application import get_vistrails_application
 
-    return Interpreter.get()
+    return get_vistrails_application().interpreter

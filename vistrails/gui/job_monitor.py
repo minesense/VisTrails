@@ -784,8 +784,8 @@ class TestJobMonitor(vistrails.gui.utils.TestVisTrailsGUI):
 
     def tearDown(self):
         vistrails.gui.utils.TestVisTrailsGUI.tearDown(self)
-        from vistrails.core.interpreter import Interpreter
-        Interpreter.flush()
+        from vistrails.core.interpreter.default import get_default_interpreter
+        get_default_interpreter().cleanup()
 
     def testSuspended(self):
         from vistrails import api

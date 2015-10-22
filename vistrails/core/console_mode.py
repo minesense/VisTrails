@@ -40,12 +40,11 @@ import unittest
 
 from vistrails.core.application import is_running_gui
 from vistrails.core.configuration import get_vistrails_configuration
-import vistrails.core.interpreter.default
+from vistrails.core.interpreter.default import get_default_interpreter
 import vistrails.core.db.io
 from vistrails.core.db.io import load_vistrail
 from vistrails.core.db.locator import XMLFileLocator
 from vistrails.core import debug
-import vistrails.core.interpreter
 from vistrails.core.vistrail.job import Workflow as JobWorkflow
 import vistrails.core.vistrail.pipeline
 from vistrails.core.utils import VistrailsInternalError
@@ -315,7 +314,7 @@ def run_parameter_explorations(w_list, extra_info = {},
     return all_errors
 
 def cleanup():
-    vistrails.core.interpreter.Interpreter.cleanup()
+    get_default_interpreter().cleanup()
 
 ################################################################################
 #Testing
@@ -363,7 +362,7 @@ class TestConsoleMode(unittest.TestCase):
         import vistrails.db.domain
        
         id_scope = vistrails.db.domain.IdScope()
-        interpreter = vistrails.core.interpreter.default.get_default_interpreter()
+        interpreter = get_default_interpreter()
         v = DummyView()
         p = vistrails.core.vistrail.pipeline.Pipeline()
         params = [ModuleParam(id=id_scope.getNewId(ModuleParam.vtType),

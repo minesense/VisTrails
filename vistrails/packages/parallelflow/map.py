@@ -98,7 +98,7 @@ def execute_wf(wf, output_port):
 
         # Clean the cache
         interpreter = get_default_interpreter()
-        interpreter.flush()
+        interpreter.cleanup()
 
         # Load the Pipeline from the temporary file
         vistrail = Vistrail()

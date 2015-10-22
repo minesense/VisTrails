@@ -49,14 +49,13 @@ import vistrails.core.db.action
 from vistrails.core.db.locator import BaseLocator, FileLocator, DBLocator, \
     UntitledLocator
 import vistrails.core.db.io
-import vistrails.core.interpreter
-import vistrails.core.interpreter.default
+from vistrails.core.interpreter import Interpreter
 from vistrails.core.modules.module_registry import ModuleRegistry
 from vistrails.core.packagemanager import PackageManager
 import vistrails.core.requirements
 from vistrails.core.startup import VistrailsStartup
 from vistrails.core.thumbnails import ThumbnailCache
-from vistrails.core.utils import VistrailsWarning
+from vistrails.core.utils import VistrailsWarning, VistrailsInternalError
 from vistrails.core.vistrail.pipeline import Pipeline
 from vistrails.core.vistrail.controller import VistrailController
 from vistrails.db import VistrailsDBException
@@ -89,6 +88,7 @@ class VistrailsApplicationInterface(object):
     def __init__(self):
         self._initialized = False
         self.notifications = {}
+        self._interpreter = None
 
     def read_options(self, args=None):
         """ read_options() -> None
@@ -151,8 +151,6 @@ class VistrailsApplicationInterface(object):
         self.startup = VistrailsStartup(options_config, command_line_config)
 
         self.keyChain = keychain.KeyChain()
-        vistrails.core.interpreter.default.connect_to_configuration(
-            self.temp_configuration)
 
         # now we want to open vistrails and point to a specific version
 
@@ -295,7 +293,8 @@ class VistrailsApplicationInterface(object):
         return True
 
     def finishSession(self):
-        vistrails.core.interpreter.Interpreter.cleanup()
+        if self._interpreter is not None:
+            self._interpreter.cleanup()
         
     def save_configuration(self):
         """ save_configuration() -> None
@@ -523,6 +522,23 @@ class VistrailsApplicationInterface(object):
         controller.close_vistrail(locator)
         controller.cleanup()
         self.remove_vistrail(locator)
+
+    def _get_interpreter(self):
+        if self._interpreter is None:
+            self._interpreter = self.make_interpreter()
+        return self._interpreter
+    interpreter = property(_get_interpreter)
+
+    def make_interpreter(self):
+        if not self._initialized:
+            debug.critical("Trying to create interpreter but application is "
+                           "not initialized!")
+            raise VistrailsInternalError("Trying to create interpreter but "
+                                         "application is not initialized")
+        interpreter = Interpreter()
+        self.temp_configuration.subscribe('cache',
+                                          interpreter.set_configuration)
+        return interpreter
 
 class VistrailsCoreApplication(VistrailsApplicationInterface):
     def __init__(self):

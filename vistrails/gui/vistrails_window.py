@@ -44,7 +44,7 @@ from vistrails.core.configuration import (get_vistrails_configuration,
                                 get_vistrails_persistent_configuration)
 from vistrails.core.db.locator import FileLocator, XMLFileLocator, DBLocator, \
     UntitledLocator
-from vistrails.core.interpreter import Interpreter
+from vistrails.core.interpreter.default import get_default_interpreter
 from vistrails.core.recent_vistrails import RecentVistrailList
 import vistrails.core.system
 import vistrails.core.db.action
@@ -72,7 +72,6 @@ from vistrails.gui.mashups.mashup_view import QMashupViewTab
 from vistrails.packages.spreadsheet.spreadsheet_cell import QCellWidget
 from vistrails.db.services.io import SaveBundle
 import vistrails.db.services.vistrail
-from vistrails.db import VistrailsDBException
 
 class QBaseViewWindow(QtGui.QMainWindow):
     def __init__(self, view=None, parent=None, f=QtCore.Qt.WindowFlags()):
@@ -2186,7 +2185,7 @@ class QVistrailsWindow(QVistrailViewWindow):
                                           'a database')
 
     def flush_cache(self):
-        Interpreter.flush()
+        get_default_interpreter().cleanup()
 
     def set_stop_on_error(self, stop):
         setattr(get_vistrails_persistent_configuration(), 'stopOnError', stop)

@@ -252,6 +252,10 @@ class Interpreter(object):
         self.filePool = self._file_pool
         self._streams = []
 
+    def set_configuration(self, field, value):
+        # TODO
+        pass
+
     def resolve_aliases(self, pipeline, customAliases=None):
         """Update parameters for the given custom aliases.
 
@@ -302,6 +306,7 @@ class Interpreter(object):
         for obj in self._objects.itervalues():
             obj.clear()
         self._objects = {}
+        self._streams = []
 
     def __del__(self):
         self.clear()

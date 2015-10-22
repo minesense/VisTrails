@@ -439,8 +439,8 @@ def remove_all_scripts():
 def reload_scripts(initial=False, name=None):
     reg = vistrails.core.modules.module_registry.get_module_registry()
     if not initial:
-        from vistrails.core.interpreter import Interpreter
-        Interpreter.clear_package(identifiers.identifier)
+        from vistrails.core.interpreter.default import get_default_interpreter
+        get_default_interpreter().clear_package(identifiers.identifier)
 
         if name is None:
             remove_all_scripts()
