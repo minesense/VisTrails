@@ -37,17 +37,67 @@ from __future__ import division
 
 import re
 import pandas as pd
+import os
 
 from vistrails.core.modules.vistrails_module import ModuleError, Module
-from vistrails.core.modules.config import ModuleSettings
+from vistrails.core.modules.config import ModuleSettings, IPort, OPort
 
-class DataFrame(pd.DataFrame, Module):
-    _settings = ModuleSettings(abstract=True)
+class DataFrame(Module):
+	_settings = ModuleSettings(abstract=True)
 
-    def __init__(self):
-        pd.DataFrame.__init__(self)
+	def __init__(self):
+		pass
 
-_modules = [DataFrame]
+	@staticmethod
+	def validate(x):
+		return isinstance(x, pd.DataFrame)
+
+class DataFrameToClipboard(Module):
+	_settings = ModuleSettings(abstract=False)
+
+	_input_ports = [IPort(name="df", signature="org.vistrails.vistrails.pandas:DataFrame"),]
+	_output_ports = []
+
+	def __init__(self):
+		Module.__init__(self)
+
+	def compute(self):
+		df = self.get_input("df")
+		if (df is not None):
+			df.to_clipboard()
+		else:
+			raise ModuleError(self, 'DataFrame = None')
+
+class DataFrameToCSV(Module):
+	_settings = ModuleSettings(abstract=False)
+
+	_input_ports = [
+		IPort(name='df', signature='org.vistrails.vistrails.pandas:DataFrame'),
+		IPort(name='output_path', signature='basic:OutputPath'), # basic:File is only for files that already exist
+		IPort(name='overwrite_if_exists', signature='basic:Boolean'),
+	]
+	_output_ports = []
+
+	def __init__(self):
+		Module.__init__(self)
+
+	def compute(self):
+		pathOb = self.get_input('output_path')
+		path = pathOb.name
+
+		overwrite = self.get_input('overwrite_if_exists')
+
+		if (os.path.exists(path) and not overwrite):
+			raise ModuleError(self, 'Output path already exists, and user has required that files not be overwritten, aborting CSV export.')
+		else:
+			df = self.get_input('df')
+			if (df is not None):
+				df.to_csv(path)
+				print 'DataFrameToCSV: wrote CSV'
+			else:
+				raise ModuleError(self, 'No data found. DataFrame = None')
+
+_modules = [DataFrame, DataFrameToClipboard, DataFrameToCSV]
 
 
 ###############################################################################
