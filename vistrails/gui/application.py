@@ -1,6 +1,6 @@
 ###############################################################################
 ##
-## Copyright (C) 2014-2015, New York University.
+## Copyright (C) 2014-2016, New York University.
 ## Copyright (C) 2011-2014, NYU-Poly.
 ## Copyright (C) 2006-2011, University of Utah.
 ## All rights reserved.
@@ -724,8 +724,6 @@ class VistrailsApplicationSingleton(VistrailsApplicationInterface,
                 sys.stdout.close()
                 sys.stdout = old_stdout
             except Exception, e:
-                import traceback
-                traceback.print_exc()
                 debug.unexpected_exception(e)
                 debug.critical("Unknown error", e)
                 result = debug.format_exc()
