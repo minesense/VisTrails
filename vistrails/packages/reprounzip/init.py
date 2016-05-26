@@ -120,7 +120,9 @@ class Run(Module):
         stderr = self.interpreter.filePool.create_file(prefix='vt_rpz_stderr_',
                                                        suffix='.txt')
 
-        args = [python, '-m', 'reprounzip.plugins.vistrails',
+        args = [python, '-c',
+                'from reprounzip.plugins.vistrails import run_from_vistrails; '
+                'run_from_vistrails()',
                 REPROUNZIP_VISTRAILS_INTERFACE_VERSION,
                 experiment.unpacker, experiment.path,
                 '%d' % self.get_input('run_number')]
@@ -140,6 +142,7 @@ class Run(Module):
                 proc = subprocess.Popen(args,
                                         stdout=stdout_fp, stderr=stderr_fp,
                                         env=environ)
+                proc.wait()
 
         with open(stderr.name, 'rb') as stderr_fp:
             while True:
@@ -148,7 +151,7 @@ class Run(Module):
                     break
                 sys.stderr.write(chunk)
 
-        if proc.wait() != 0:
+        if proc.returncode != 0:
             raise ModuleError(self,
                               "Plugin returned with code %d" % proc.returncode)
 
