@@ -38,9 +38,34 @@ from __future__ import division
 import re
 import pandas as pd
 import os
+import types
 
 from vistrails.core.modules.vistrails_module import ModuleError, Module
 from vistrails.core.modules.config import ModuleSettings, IPort, OPort
+
+UNIT = 1./2
+
+SHAPE_DF = [
+	(1,1),
+
+	(0,1),
+	(0,0),
+	(1,0),
+	(1,2),
+
+	(0,2),
+	(0,1),
+	(2,1),
+
+	(2,2),
+	(1,2),
+	(1,1),
+
+	(2,1),
+	(2,0),
+	(1,0),
+]
+SHAPE_DF = [(x[0]*UNIT, x[1]*UNIT) for x in SHAPE_DF]
 
 class DataFrame(Module):
 	_settings = ModuleSettings(abstract=True)
@@ -55,7 +80,7 @@ class DataFrame(Module):
 class DataFrameToClipboard(Module):
 	_settings = ModuleSettings(abstract=False)
 
-	_input_ports = [IPort(name="df", signature="org.vistrails.vistrails.pandas:DataFrame"),]
+	_input_ports = [IPort(name="df", signature="org.vistrails.vistrails.pandas:DataFrame", shape=SHAPE_DF),]
 	_output_ports = []
 
 	def __init__(self):
@@ -72,7 +97,7 @@ class DataFrameToCSV(Module):
 	_settings = ModuleSettings(abstract=False)
 
 	_input_ports = [
-		IPort(name='df', signature='org.vistrails.vistrails.pandas:DataFrame'),
+		IPort(name='df', signature='org.vistrails.vistrails.pandas:DataFrame', shape=SHAPE_DF),
 		IPort(name='output_path', signature='basic:OutputPath'), # basic:File is only for files that already exist
 		IPort(name='overwrite_if_exists', signature='basic:Boolean'),
 	]
@@ -97,7 +122,64 @@ class DataFrameToCSV(Module):
 			else:
 				raise ModuleError(self, 'No data found. DataFrame = None')
 
-_modules = [DataFrame, DataFrameToClipboard, DataFrameToCSV]
+class LoadFile(Module):
+	_settings = ModuleSettings(abstract=False)
+
+	_input_ports = [
+		IPort(name='input_path', signature='basic:String'), # basic:File is only for files that already exist
+	]
+	_output_ports = [
+		OPort(name='df', signature='org.vistrails.vistrails.pandas:DataFrame', shape=SHAPE_DF),
+	]
+
+	def compute(self):
+		fpath = self.get_input('input_path')
+
+		ext = os.path.splitext(fpath)[1]
+		if (ext == '.pkl'):
+			df = pd.read_pickle(fpath)
+		elif (ext == '.xlsx'):
+			df = pd.read_excel(fpath)
+		elif (ext == '.csv'):
+			df = pd.read_csv(fpath)
+		else:
+			raise ValueError(Fore.RED+'Filename extension not recognized (%s); expecting pkl, xlsx, or csv.' % fpath +Fore.RESET)
+
+		self.set_output('df', df)
+
+class DataFrameToVistrailsTable(Module):
+	""" Converts a Pandas DataFrame to VisTrails Table, for viewing in VisTrails Spreadsheet. """
+
+	_settings = ModuleSettings(abstract=False)
+
+	_input_ports = [
+		IPort(name='df', signature='org.vistrails.vistrails.pandas:DataFrame', shape=SHAPE_DF)
+	]
+	_output_ports = [
+		OPort(name='table', signature='org.vistrails.vistrails.tabledata:Table'),
+	]
+
+	def compute(self):
+		df = self.get_input('df')
+
+		n, d = df.shape
+
+		def get_column(self, colIdx):
+			return self.df[self.df.columns[colIdx]].tolist()
+
+		# create an instance of made-up class, which will imitate the behavior of the real TableData
+		# just enough to get the required functionality to work
+		out = type("TableDataImitator", (object,), {})
+		out.columns = d
+		out.rows = n
+		out.df = df
+		out.get_column = types.MethodType(get_column, out)
+		out.names = df.columns.tolist()
+
+		self.set_output('table', out)
+
+
+_modules = [DataFrame, DataFrameToClipboard, DataFrameToCSV, LoadFile, DataFrameToVistrailsTable]
 
 
 ###############################################################################
