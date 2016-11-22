@@ -47,12 +47,12 @@ from .identifiers import *
 
 
 def package_dependencies():
-    pm = get_package_manager()
+    # pm = get_package_manager()
     # spreadsheet_identifier = 'org.vistrails.vistrails.spreadsheet'
     # if pm.has_package(spreadsheet_identifier):
     #     return [spreadsheet_identifier]
     # else: # pragma: no cover
-    return []
+    return ['org.vistrails.vistrails.tabledata']
 
 
 def package_requirements():
