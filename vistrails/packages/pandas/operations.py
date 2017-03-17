@@ -1,47 +1,17 @@
-###############################################################################
-##
-## Copyright (C) 2014-2015, New York University.
-## Copyright (C) 2011-2014, NYU-Poly.
-## Copyright (C) 2006-2011, University of Utah.
-## All rights reserved.
-## Contact: contact@vistrails.org
-##
-## This file is part of VisTrails.
-##
-## "Redistribution and use in source and binary forms, with or without
-## modification, are permitted provided that the following conditions are met:
-##
-##  - Redistributions of source code must retain the above copyright notice,
-##    this list of conditions and the following disclaimer.
-##  - Redistributions in binary form must reproduce the above copyright
-##    notice, this list of conditions and the following disclaimer in the
-##    documentation and/or other materials provided with the distribution.
-##  - Neither the name of the New York University nor the names of its
-##    contributors may be used to endorse or promote products derived from
-##    this software without specific prior written permission.
-##
-## THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-## AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
-## THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-## PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
-## CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-## EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-## PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-## OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-## WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-## OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-## ADVISED OF THE POSSIBILITY OF SUCH DAMAGE."
-##
-###############################################################################
-from __future__ import division
+from __future__ import division, print_function
 
 import re
 import pandas as pd
 import os
 import types
+from sqlalchemy import MetaData, Table, select, text
+import sqlalchemy
 
 from vistrails.core.modules.vistrails_module import ModuleError, Module
 from vistrails.core.modules.config import ModuleSettings, IPort, OPort
+
+__author__ = "Matthew Dirks"
+__email__ = "matt@skylogic.ca"
 
 UNIT = 1./2
 
@@ -68,6 +38,7 @@ SHAPE_DF = [
 SHAPE_DF = [(x[0]*UNIT, x[1]*UNIT) for x in SHAPE_DF]
 
 class DataFrame(Module):
+	""" Allows a Pandas DataFrame to be used as input/output ports in VisTrails. """
 	_settings = ModuleSettings(abstract=True)
 
 	def __init__(self):
@@ -118,7 +89,7 @@ class DataFrameToCSV(Module):
 			df = self.get_input('df')
 			if (df is not None):
 				df.to_csv(path)
-				print 'DataFrameToCSV: wrote CSV'
+				print('DataFrameToCSV: wrote CSV')
 			else:
 				raise ModuleError(self, 'No data found. DataFrame = None')
 
@@ -126,14 +97,14 @@ class LoadFile(Module):
 	_settings = ModuleSettings(abstract=False)
 
 	_input_ports = [
-		IPort(name='input_path', signature='basic:String'), # basic:File is only for files that already exist
+		IPort(name='inputFile', signature='basic:File'), # Note: basic:File is only for files that already exist (which it should in this case)
 	]
 	_output_ports = [
 		OPort(name='df', signature='org.vistrails.vistrails.pandas:DataFrame', shape=SHAPE_DF),
 	]
 
 	def compute(self):
-		fpath = self.get_input('input_path')
+		fpath = self.get_input('inputFile').name
 
 		ext = os.path.splitext(fpath)[1]
 		if (ext == '.pkl'):
@@ -178,8 +149,116 @@ class DataFrameToVistrailsTable(Module):
 
 		self.set_output('table', out)
 
+class FilterNulls(Module):
+	""" Filters a Pandas DataFrame to either keep or discard rows that are NaN, empty, None, or Null. """
 
-_modules = [DataFrame, DataFrameToClipboard, DataFrameToCSV, LoadFile, DataFrameToVistrailsTable]
+	_settings = ModuleSettings(abstract=False)
+
+	_input_ports = [
+		IPort(name='df', signature='org.vistrails.vistrails.pandas:DataFrame', shape=SHAPE_DF),
+		IPort(name='columnName', signature='basic:String'),
+		IPort(name='discard', signature='basic:Boolean', default=True, docstring='If checked, will discard null (empty) rows. If not checked, will keep only the empty rows.')
+	]
+	_output_ports = [
+		OPort(name='dfNew', signature='org.vistrails.vistrails.pandas:DataFrame', shape=SHAPE_DF)
+	]
+
+	def compute(self):
+		df = self.get_input('df')
+		columnName = self.get_input('columnName')
+		discard = self.get_input('discard')
+
+		if (columnName not in df):
+			raise ValueError('DataFrame does not have specified column (%s). Valid column names are: %s.' % (columnName, ','.join(['"%s"' % col for col in df.columns])))
+
+		mask = df[columnName].isnull()
+
+		if (discard):
+			mask = ~mask
+
+		dfNew = df[mask]
+		self.set_output('dfNew', dfNew)
+
+class FilterByValue(Module):
+	""" Filters a Pandas DataFrame to either keep or discard rows that are NaN, empty, None, or Null. """
+
+	_settings = ModuleSettings(abstract=False)
+
+	_input_ports = [
+		IPort(name='df', signature='org.vistrails.vistrails.pandas:DataFrame', shape=SHAPE_DF),
+		IPort(name='columnName', signature='basic:String'),
+		IPort(name='value', signature='basic:Variant'),
+		IPort(name='discard', signature='basic:Boolean', default=False, docstring='If checked, will discard the rows that match, otherwise will keep only the matching rows.')
+	]
+	_output_ports = [
+		OPort(name='dfNew', signature='org.vistrails.vistrails.pandas:DataFrame', shape=SHAPE_DF)
+	]
+
+	def compute(self):
+		df = self.get_input('df')
+		columnName = self.get_input('columnName')
+		value = self.get_input('value')
+		discard = self.get_input('discard')
+
+		if (columnName not in df):
+			raise ValueError('DataFrame does not have specified column (%s). Valid column names are: %s.' % (columnName, ','.join(['"%s"' % col for col in df.columns])))
+
+		# cast value into the same data type as the DataFrame column
+		try:
+			value = df[columnName].dtype.type(value)
+		except:
+			# failed to cast dtype
+			try:
+				# attempt to match by equality, even though dtype cast failed, just to see if it works
+				mask = df[columnName]==value
+			except:
+				raise Exception('Failed to cast value as ' + str(df[columnName].dtype) + '. Check that columnName and value are correct.')
+
+		if (isinstance(value, str)):
+			mask = df[columnName].str.match(value, as_indexer=True)
+		else:
+			mask = df[columnName]==value
+
+		if (discard):
+			mask = ~mask
+
+		dfNew = df[mask]
+		self.set_output('dfNew', dfNew)
+
+class ReadSqlQuery(Module):
+	_settings = ModuleSettings(abstract=False)
+
+	_input_ports = [
+		IPort(name='sqlStatement', signature='basic:String'),
+		IPort(name='sqlStatement', signature='basic:String'),
+		IPort(name='connection', signature='sql:DBConnection'),
+	]
+	_output_ports = [
+		OPort(name='df', signature='org.vistrails.vistrails.pandas:DataFrame', shape=SHAPE_DF),
+	]
+
+	def compute(self):
+		sqlStatement = self.get_input('sqlStatement')
+		connection = self.get_input('connection')
+
+		engine = connection.engine
+		metadata = MetaData(bind=connection)
+
+		# db_channelSummaries = Table('ChannelSummaries', metadata, autoload=True)
+		# stmt = text('''SELECT mtlRunId, feKaCPS, feKbCPS, cuKaCPS, niKaCPS 
+		#        FROM ChannelSummaries
+		#        WHERE feKaCPS IS NOT NULL
+		#    ''')
+		# db_table = connection.execute(sqlStatement)
+
+		df = pd.read_sql_query(sqlStatement, engine)
+
+		self.set_output('df', df)
+
+
+
+
+_modules = [DataFrame, DataFrameToClipboard, DataFrameToCSV, LoadFile, DataFrameToVistrailsTable, FilterNulls, FilterByValue, ReadSqlQuery]
 
 
 ###############################################################################
