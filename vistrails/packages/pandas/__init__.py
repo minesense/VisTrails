@@ -15,7 +15,7 @@ def package_dependencies():
     # if pm.has_package(spreadsheet_identifier):
     #     return [spreadsheet_identifier]
     # else: # pragma: no cover
-    return ['org.vistrails.vistrails.tabledata']
+    return ['org.vistrails.vistrails.tabledata', 'org.vistrails.vistrails.sql']
 
 
 def package_requirements():
