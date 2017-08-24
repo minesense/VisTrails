@@ -49,6 +49,7 @@ class DataFrame(Module):
 		return isinstance(x, pd.DataFrame)
 
 class DataFrameToClipboard(Module):
+	""" Places the contents of the input DataFrame in to the clipboard (for pasting into other applications). """
 	_settings = ModuleSettings(abstract=False)
 
 	_input_ports = [IPort(name="df", signature="org.vistrails.vistrails.pandas:DataFrame", shape=SHAPE_DF),]
@@ -65,6 +66,7 @@ class DataFrameToClipboard(Module):
 			raise ModuleError(self, 'DataFrame = None')
 
 class DataFrameToCSV(Module):
+	""" Writes input DataFrame to a CSV file at the given path (output_path). """
 	_settings = ModuleSettings(abstract=False)
 
 	_input_ports = [
@@ -94,13 +96,18 @@ class DataFrameToCSV(Module):
 				raise ModuleError(self, 'No data found. DataFrame = None')
 
 class LoadFile(Module):
+	""" Loads file from disk as a Pandas DataFrame. inputFile extension can be pickle (.pkl), excel (.xlsx), csv, hdf, or json. """
+
 	_settings = ModuleSettings(abstract=False)
 
 	_input_ports = [
-		IPort(name='inputFile', signature='basic:File'), # Note: basic:File is only for files that already exist (which it should in this case)
+		# Note: basic:File is only for files that already exist (which it should in this case)
+		IPort(name='inputFile', signature='basic:File', 
+			docstring='A file that pandas library can process as a DataFrame (pkl, xlsx, csv, hdf, or json)'),
 	]
 	_output_ports = [
-		OPort(name='df', signature='org.vistrails.vistrails.pandas:DataFrame', shape=SHAPE_DF),
+		OPort(name='df', signature='org.vistrails.vistrails.pandas:DataFrame', shape=SHAPE_DF,
+			docstring='A pandas DataFrame'),
 	]
 
 	def compute(self):
@@ -113,13 +120,17 @@ class LoadFile(Module):
 			df = pd.read_excel(fpath)
 		elif (ext == '.csv'):
 			df = pd.read_csv(fpath)
+		elif (ext == '.hdf'):
+			df = pd.read_hdf(fpath)
+		elif (ext == '.json'):
+			df = pd.read_json(fpath)
 		else:
-			raise ValueError(Fore.RED+'Filename extension not recognized (%s); expecting pkl, xlsx, or csv.' % fpath +Fore.RESET)
+			raise ValueError(Fore.RED+'Filename extension not recognized (%s); expecting pkl, xlsx, csv, hdf, or json.' % fpath +Fore.RESET)
 
 		self.set_output('df', df)
 
 class DataFrameToVistrailsTable(Module):
-	""" Converts a Pandas DataFrame to VisTrails Table, for viewing in VisTrails Spreadsheet. """
+	""" Converts a Pandas DataFrame to view in VisTrails Spreadsheet. """
 
 	_settings = ModuleSettings(abstract=False)
 
@@ -155,12 +166,12 @@ class FilterNulls(Module):
 	_settings = ModuleSettings(abstract=False)
 
 	_input_ports = [
-		IPort(name='df', signature='org.vistrails.vistrails.pandas:DataFrame', shape=SHAPE_DF),
-		IPort(name='columnName', signature='basic:String'),
+		IPort(name='df', signature='org.vistrails.vistrails.pandas:DataFrame', shape=SHAPE_DF, docstring='DataFrame to filter.'),
+		IPort(name='columnName', signature='basic:String', docstring='Name of column in DataFrame (df) to perform filtering on.'),
 		IPort(name='discard', signature='basic:Boolean', default=True, docstring='If checked, will discard null (empty) rows. If not checked, will keep only the empty rows.')
 	]
 	_output_ports = [
-		OPort(name='dfNew', signature='org.vistrails.vistrails.pandas:DataFrame', shape=SHAPE_DF)
+		OPort(name='df_filtered', signature='org.vistrails.vistrails.pandas:DataFrame', shape=SHAPE_DF)
 	]
 
 	def compute(self):
@@ -176,22 +187,22 @@ class FilterNulls(Module):
 		if (discard):
 			mask = ~mask
 
-		dfNew = df[mask]
-		self.set_output('dfNew', dfNew)
+		df_filtered = df[mask]
+		self.set_output('df_filtered', df_filtered)
 
 class FilterByValue(Module):
-	""" Filters a Pandas DataFrame to either keep or discard rows that are NaN, empty, None, or Null. """
+	""" Filters a Pandas DataFrame to either keep or discard rows that match the input value. """
 
 	_settings = ModuleSettings(abstract=False)
 
 	_input_ports = [
-		IPort(name='df', signature='org.vistrails.vistrails.pandas:DataFrame', shape=SHAPE_DF),
-		IPort(name='columnName', signature='basic:String'),
-		IPort(name='value', signature='basic:Variant'),
+		IPort(name='df', signature='org.vistrails.vistrails.pandas:DataFrame', shape=SHAPE_DF, docstring='DataFrame to filter.'),
+		IPort(name='columnName', signature='basic:String', docstring='Name of column in DataFrame (df) to perform filtering on.'),
+		IPort(name='value', signature='basic:Variant', docstring='All rows of DataFrame (df) in column (columnName) will be compared to this value.'),
 		IPort(name='discard', signature='basic:Boolean', default=False, docstring='If checked, will discard the rows that match, otherwise will keep only the matching rows.')
 	]
 	_output_ports = [
-		OPort(name='dfNew', signature='org.vistrails.vistrails.pandas:DataFrame', shape=SHAPE_DF)
+		OPort(name='df_filtered', signature='org.vistrails.vistrails.pandas:DataFrame', shape=SHAPE_DF)
 	]
 
 	def compute(self):
@@ -222,14 +233,14 @@ class FilterByValue(Module):
 		if (discard):
 			mask = ~mask
 
-		dfNew = df[mask]
-		self.set_output('dfNew', dfNew)
+		df_filtered = df[mask]
+		self.set_output('df_filtered', df_filtered)
 
 class ReadSqlQuery(Module):
+	""" Runs a SQL query on database (given by sql:DBConnection) and returns the result in a pandas DataFrame. """
 	_settings = ModuleSettings(abstract=False)
 
 	_input_ports = [
-		IPort(name='sqlStatement', signature='basic:String'),
 		IPort(name='sqlStatement', signature='basic:String'),
 		IPort(name='connection', signature='sql:DBConnection'),
 	]
@@ -244,29 +255,8 @@ class ReadSqlQuery(Module):
 		engine = connection.engine
 		metadata = MetaData(bind=connection)
 
-		# db_channelSummaries = Table('ChannelSummaries', metadata, autoload=True)
-		# stmt = text('''SELECT mtlRunId, feKaCPS, feKbCPS, cuKaCPS, niKaCPS 
-		#        FROM ChannelSummaries
-		#        WHERE feKaCPS IS NOT NULL
-		#    ''')
-		# db_table = connection.execute(sqlStatement)
-
 		df = pd.read_sql_query(sqlStatement, engine)
 
 		self.set_output('df', df)
 
-
-
-
 _modules = [DataFrame, DataFrameToClipboard, DataFrameToCSV, LoadFile, DataFrameToVistrailsTable, FilterNulls, FilterByValue, ReadSqlQuery]
-
-
-###############################################################################
-
-# import unittest
-# from vistrails.tests.utils import execute, intercept_result
-# from .identifiers import identifier
-
-
-# class TestJoin(unittest.TestCase):
-#     ...
